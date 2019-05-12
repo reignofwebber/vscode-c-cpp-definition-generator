@@ -2,6 +2,8 @@
 	"name": "c-cpp-source-code-generator",
 	"displayName": "c/cpp source code generator",
 	"description": "generator c/cpp file from header file",
+	"publisher": "reignofwebber",
+	"repository": "https://github.com/reignofwebber/vscode-c-cpp-source-code-generator.git",
 	"version": "0.0.1",
 	"engines": {
 		"vscode": "^1.33.0"
