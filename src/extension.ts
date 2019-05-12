@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as fs from "fs";
 import * as cppHelper from "./cppext";
 import * as semantics from './semantics';
 
@@ -17,12 +18,17 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 		document.save();
+		let content = fs.readFileSync(document.fileName, 'utf-8');
+		let scope = semantics.Scope.createScope(content);
 		let source = cppHelper.createSourceFromHeader(document.fileName);
+
 
 		for (let line = 0; line < document.lineCount; ++line) {
 			let declaration = document.lineAt(line).text;
 			if (semantics.isDeclaration(declaration)) {
-				let selection = source.updateDefinition(declaration);
+				let declarationPos = content.indexOf(declaration);
+				let scopePrefix = scope.getScopePrefix(declarationPos);
+				let selection = source.updateDefinition(declaration, scopePrefix);
 			}
 		}
 
@@ -47,10 +53,15 @@ export function activate(context: vscode.ExtensionContext) {
 		// save header file.
 		document.save();
 
+		let content = fs.readFileSync(document.fileName, 'utf-8');
+		let declarationPos = content.indexOf(declaration);
+		let scope = semantics.Scope.createScope(content);
+		let scopePrefix = scope.getScopePrefix(declarationPos);
+
 		// create source file or do nothing if it's exists
 		let source = cppHelper.createSourceFromHeader(document.fileName);
 		// update definition
-		let selection = source.updateDefinition(declaration);
+		let selection = source.updateDefinition(declaration, scopePrefix);
 		// open this file
 		// let cppDocument = vscode.workspace.openTextDocument(source.getPath());
 		vscode.window.showTextDocument(vscode.Uri.file(source.getPath())).then(editor => {

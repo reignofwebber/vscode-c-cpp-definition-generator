@@ -36,6 +36,10 @@ export function createSourceFromHeader(fullFileName: string, isC: boolean = fals
     return new SourceFile(file, fileName);
 }
 
+export function getDeclarationPos(content: string, declaration: string) :number {
+    return content.indexOf(declaration);
+}
+
 
 class SourceFile {
     private _path: string;
@@ -63,7 +67,7 @@ class SourceFile {
         let definitionSnippet = data.substring(lastLinebreak + 1, linebreak);
         if (definitionSnippet.match(/.+\(.*\).*\{/)) {
             // determine which line
-            return [definitionSnippet, tools.linesOfContent(prevContent) - 1];
+            return [definitionSnippet, tools.linesOfContent(prevContent)];
         } else {
             return undefined;
         }
@@ -73,17 +77,17 @@ class SourceFile {
      * updateDefinition
      * @param declaration
      */
-    public updateDefinition(declaration :string) :vscode.Selection {
+    public updateDefinition(declaration :string, scopePrefix: string) :vscode.Selection {
         let definitionDesc = this._getDefinitionLine(declaration);
         if (definitionDesc) {
             let data = fs.readFileSync(this._path, 'utf-8');
-            let newData = data.replace(definitionDesc[0], semantics.getFullDefinition(declaration, true));
+            let newData = data.replace(definitionDesc[0], semantics.getFullDefinition(declaration, scopePrefix, true));
             fs.writeFileSync(this._path, newData, 'utf-8');
 
             let pos = new vscode.Position(definitionDesc[1], 4);
             return new vscode.Selection(pos, pos);
         } else {
-            let definition = semantics.getFullDefinition(declaration);
+            let definition = semantics.getFullDefinition(declaration, scopePrefix);
             fs.appendFileSync(this._path, definition, 'utf-8');
             let length = tools.lines(this._path);
             let pos = new vscode.Position(tools.lines(this._path) - 3, 4);
