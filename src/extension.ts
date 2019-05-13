@@ -20,8 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 		document.save();
 		let content = fs.readFileSync(document.fileName, 'utf-8');
 		let scope = semantics.Scope.createScope(content);
-		let source = cppHelper.createSourceFromHeader(document.fileName);
-
+		let source = cppHelper.createSourceFromHeader(document.fileName, scope.isEmpty());
 
 		for (let line = 0; line < document.lineCount; ++line) {
 			let declaration = document.lineAt(line).text;
@@ -59,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
 		let scopePrefix = scope.getScopePrefix(declarationPos);
 
 		// create source file or do nothing if it's exists
-		let source = cppHelper.createSourceFromHeader(document.fileName);
+		let source = cppHelper.createSourceFromHeader(document.fileName, scope.isEmpty());
 		// update definition
 		let selection = source.updateDefinition(declaration, scopePrefix);
 		// open this file

@@ -25,15 +25,23 @@ export function isHeaderFile(fileName: string) :boolean {
  * @param isC
  * @returns fd
  */
-export function createSourceFromHeader(fullFileName: string, isC: boolean = false) :SourceFile {
+export function createSourceFromHeader(fullFileName: string, isC: boolean = true) :SourceFile {
     let slashPos = fullFileName.lastIndexOf('/');
+    if (slashPos === -1) {
+        slashPos = fullFileName.lastIndexOf('\\');
+    }
+    if (slashPos === -1) {
+        throw new Error('not recognized path');
+    }
+
+
     let dotPos = fullFileName.lastIndexOf('.');
 
     let filePath = fullFileName.substr(0, slashPos);
     let fileNameNoExt = fullFileName.substring(slashPos + 1, dotPos);
-    let fileName = fullFileName.substr(slashPos + 1);
+    let headerFileName = fullFileName.substr(slashPos + 1);
     let file = path.join(filePath, fileNameNoExt + (isC ? '.c' : '.cpp'));
-    return new SourceFile(file, fileName);
+    return new SourceFile(file, headerFileName);
 }
 
 export function getDeclarationPos(content: string, declaration: string) :number {

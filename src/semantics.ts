@@ -217,4 +217,14 @@ export class Scope {
         }
         return res;
     }
+
+    /**
+     * isEmpty
+     */
+    public isEmpty() : boolean {
+        if (this._scopes.length) {
+            return false;
+        }
+        return true;
+    }
 }
