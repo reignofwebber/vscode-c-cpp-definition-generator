@@ -25,9 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
 		for (let line = 0; line < document.lineCount; ++line) {
 			let declaration = document.lineAt(line).text;
 			if (semantics.isDeclaration(declaration)) {
-				let declarationPos = content.indexOf(declaration);
-				let scopePrefix = scope.getScopePrefix(declarationPos);
-				let selection = source.updateDefinition(declaration, scopePrefix);
+				let declarationPos = document.offsetAt(new vscode.Position(line, 0));
+				let scopes = scope.getScopes(declarationPos);
+				let selection = source.updateDefinition(declaration, scopes);
 			}
 		}
 
@@ -46,6 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		let position = editor.selection.active.line;
 		let declaration = document.lineAt(position).text;
+		let declarationPos = document.offsetAt(editor.selection.active);
 
 		if (!semantics.isDeclaration(declaration)) { return; }
 
@@ -53,14 +54,13 @@ export function activate(context: vscode.ExtensionContext) {
 		document.save();
 
 		let content = fs.readFileSync(document.fileName, 'utf-8');
-		let declarationPos = content.indexOf(declaration);
 		let scope = semantics.Scope.createScope(content);
-		let scopePrefix = scope.getScopePrefix(declarationPos);
+		let scopes = scope.getScopes(declarationPos);
 
 		// create source file or do nothing if it's exists
 		let source = cppHelper.createSourceFromHeader(document.fileName, scope.isEmpty());
 		// update definition
-		let selection = source.updateDefinition(declaration, scopePrefix);
+		let selection = source.updateDefinition(declaration, scopes);
 		// open this file
 		// let cppDocument = vscode.workspace.openTextDocument(source.getPath());
 		vscode.window.showTextDocument(vscode.Uri.file(source.getPath())).then(editor => {

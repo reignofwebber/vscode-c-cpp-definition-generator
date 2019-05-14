@@ -1,66 +1,78 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 
-class Definition {
-    public prefix: string[] = [];
-    public scope: string[] = [];
+export class Definition {
+    public prefixs: string[] = [];
+    public scopes: string[] = [];
     public name: string = '';
     public params: string = '';
     public decoration: string[] = [];
     public isValid: boolean = false;
+
+    /**
+     * toString
+     */
+    public toString(half: boolean = false) :string {
+        let s = '';
+        if (!half) {
+            s += '\n';
+        }
+
+        let scopePrefix = '';
+        for (let scope of this.scopes) {
+            scopePrefix += (scope + '::');
+        }
+        let prefix = this.prefixs.join(' ');
+        s += prefix;
+        s += ` ${scopePrefix}${this.name}(${this.params})`;
+        let postfix = this.decoration.join(' ');
+        s += postfix;
+        if (half) {
+            s += ' {';
+        } else {
+            s += ' {\n    \n}\n';
+        }
+        return s;
+    }
+
+    /**
+     * getIdentifier
+     */
+    public getIdentifier() {
+        let scopePrefix = '';
+        for (let scope of this.scopes) {
+            scopePrefix += (scope + '::');
+        }
+        return scopePrefix + this.name;
+    }
 }
 
-
+const regDeclaration = /(.*?)\((.*)\)\s*(\d*)\s*;/;
 
 /**
  * if is declaration (suppose all in this string)
  * @param statement
  */
 export function isDeclaration(statement: string) :boolean {
-    let leftBracketPos = statement.indexOf('(');
-    if (leftBracketPos === -1) { return false; }
-
-    let rightBracketPos = statement.indexOf(')');
-    if (rightBracketPos === -1 || rightBracketPos <= leftBracketPos) { return false; }
-
-    // return and name
-    // let rn = statement.substr(0, leftBracketPos);
-    // let rns = rn.split(/\s+/);
-    // if (rns.length !== 2) {
-    //     // vscode.window.showErrorMessage("not declaration: rn's length !== 2");
-    //     return false;
-    // }
-
-    // parameters (not verify for now)
-
-    let remain = statement.substr(rightBracketPos + 1);
-    if (remain.indexOf(';') === -1) {
-        // vscode.window.showErrorMessage('not declaration: remain not contains ;');
-        return false;
+    if (regDeclaration.exec(statement)) {
+        return true;
     }
-
-    return true;
+    return false;
 }
 
 /**
  * get declaration from content.
  * @param declaration
  */
-export function getDefinition(declaration: string) :Definition {
+export function getDefinition(declaration: string, scopes: string[]) :Definition {
     let definition = new Definition;
+    definition.scopes = scopes;
 
-    let leftBracketPos = declaration.indexOf('(');
-    if (leftBracketPos === -1) {
-        return definition;
-    }
-
-    let rightBracketPos = declaration.indexOf(')');
-    if (rightBracketPos === -1 || rightBracketPos <= leftBracketPos) {
-        return definition;
-    }
+    let match = regDeclaration.exec(declaration);
+    if (!match) { return definition; }
 
     // return and name
-    let rn = declaration.substr(0, leftBracketPos).trim();
+    let rn = match[1].trim();
     let rns = rn.split(/\s+/);
 
     // filter specific identifier
@@ -76,10 +88,10 @@ export function getDefinition(declaration: string) :Definition {
             continue;
         }
         // add to prefix
-        definition.prefix.push(identifier);
+        definition.prefixs.push(identifier);
     }
 
-    let name = definition.prefix.pop();
+    let name = definition.prefixs.pop();
     if (name) {
         definition.name = name;
     } else {
@@ -87,10 +99,10 @@ export function getDefinition(declaration: string) :Definition {
     }
 
     // parameters (not verify for now)
-    definition.params = declaration.substring(leftBracketPos + 1, rightBracketPos);
+    definition.params = match[2];
 
 
-    let remain = declaration.substr(rightBracketPos + 1);
+    let remain = match[3];
     let validDecorations = ['const'];
     for (let d of validDecorations) {
         if (remain.indexOf(d) !== -1) {
@@ -103,29 +115,6 @@ export function getDefinition(declaration: string) :Definition {
 }
 
 
-/**
- * get full definition
- * @param declaration
- */
-export function getFullDefinition(declaration: string, scopePrefix: string, half: boolean = false) :string {
-    let definition = getDefinition(declaration);
-    let s = '';
-    if (!half) {
-        s += '\n';
-    }
-    let prefix = definition.prefix.join(' ');
-    s += prefix;
-    s += ` ${scopePrefix}${definition.name}(${definition.params})`;
-    let postfix = definition.decoration.join(' ');
-    s += postfix;
-    if (half) {
-        s += ' {';
-    } else {
-        s += ' {\n    \n}\n';
-    }
-    return s;
-}
-
 class ScopeEntity {
     public name :string = '';
     public leftBrace: number = -1;
@@ -134,7 +123,7 @@ class ScopeEntity {
 
 export class Scope {
     private _scopes: ScopeEntity[] = [];
-    private _regexScope: RegExp = /(?:namespace|class|struct)\s+(.+?)\s*\:?\s*{/;
+    private _regexScope: RegExp = /(?:namespace|class|struct)\s+(\S+)\s*.*{/;
     private _scopeIdentifiers: string[] = ['namespace', 'class', 'struct'];
 
     constructor(content: string) {
@@ -213,6 +202,19 @@ export class Scope {
         for (let scope of this._scopes) {
             if (pos > scope.leftBrace && pos < scope.rightBrace) {
                 res += `${scope.name}::`;
+            }
+        }
+        return res;
+    }
+
+    /**
+     * getScopes
+     */
+    public getScopes(pos: number) :string[] {
+        let res: string[] = [];
+        for (let scope of this._scopes) {
+            if (pos > scope.leftBrace && pos < scope.rightBrace) {
+                res.push(scope.name);
             }
         }
         return res;

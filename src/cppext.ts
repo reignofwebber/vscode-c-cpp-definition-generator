@@ -62,11 +62,22 @@ class SourceFile {
      * @param file
      * @param declaration
      */
-    private _getDefinitionLine(declaration: string) :[string, number] | undefined {
+    private _getDefinitionLine(declaration: string, scopes: string[]) :[string, number] | undefined {
         let line = -1;
         let data = fs.readFileSync(this._path, 'utf-8');
-        let definition = semantics.getDefinition(declaration);
-        let definitionIndex = data.indexOf(definition.name);
+        let definition = semantics.getDefinition(declaration, scopes);
+        let identifier = definition.getIdentifier();
+        let definitionIndex = data.indexOf(identifier);
+        // determine if pure identifier
+        let tmpIndex = definitionIndex;
+        // 1. find towards left
+        if (' \t\n\r\v'.indexOf(data.charAt(definitionIndex - 1)) === -1) {
+            return undefined;
+        }
+        // 2. find towards right
+        if (' \t\n\r\v('.indexOf(data.charAt(definitionIndex + identifier.length)) === -1) {
+            return undefined;
+        }
 
         if (definitionIndex === -1) { return undefined; }
         let linebreak = data.indexOf('\n', definitionIndex);
@@ -85,22 +96,28 @@ class SourceFile {
      * updateDefinition
      * @param declaration
      */
-    public updateDefinition(declaration :string, scopePrefix: string) :vscode.Selection {
-        let definitionDesc = this._getDefinitionLine(declaration);
+    public updateDefinition(declaration :string, scopes: string[]) :vscode.Selection {
+        let definitionDesc = this._getDefinitionLine(declaration, scopes);
         if (definitionDesc) {
             let data = fs.readFileSync(this._path, 'utf-8');
-            let newData = data.replace(definitionDesc[0], semantics.getFullDefinition(declaration, scopePrefix, true));
-            fs.writeFileSync(this._path, newData, 'utf-8');
-
-            let pos = new vscode.Position(definitionDesc[1], 4);
-            return new vscode.Selection(pos, pos);
+            let definition = semantics.getDefinition(declaration, scopes);
+            if (definition.isValid) {
+                let newData = data.replace(definitionDesc[0], definition.toString(true));
+                fs.writeFileSync(this._path, newData, 'utf-8');
+                let pos = new vscode.Position(definitionDesc[1], 4);
+                return new vscode.Selection(pos, pos);
+            }
         } else {
-            let definition = semantics.getFullDefinition(declaration, scopePrefix);
-            fs.appendFileSync(this._path, definition, 'utf-8');
-            let length = tools.lines(this._path);
-            let pos = new vscode.Position(tools.lines(this._path) - 3, 4);
-            return new vscode.Selection(pos, pos);
+
+            let definition = semantics.getDefinition(declaration, scopes);
+            if (definition.isValid) {
+                fs.appendFileSync(this._path, definition.toString(), 'utf-8');
+                let length = tools.lines(this._path);
+                let pos = new vscode.Position(length - 3, 4);
+                return new vscode.Selection(pos, pos);
+            }
         }
+        return new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
     }
 
     /**
