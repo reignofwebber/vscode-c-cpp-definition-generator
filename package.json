@@ -1,9 +1,10 @@
 {
 	"name": "c-cpp-definition-generator",
-	"displayName": "c/cpp definition generator",
-	"description": "generator c/cpp definition from header file",
+	"displayName": "c/c++ definition generator",
+	"description": "generator c/c++ definition from header file",
 	"publisher": "reignofwebber",
 	"repository": "https://github.com/reignofwebber/vscode-c-cpp-definition-generator.git",
+	"license": "MIT",
 	"version": "0.0.1",
 	"engines": {
 		"vscode": "^1.33.0"
