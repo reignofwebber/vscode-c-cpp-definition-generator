@@ -4,6 +4,8 @@ All notable changes to the "c-cpp-source-code-generator" extension will be docum
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [v0.0.2](2019-06-20)
 
-- Initial release
+- run command will not save document.
+- command can jump to the right position.
+- bugs fixed.

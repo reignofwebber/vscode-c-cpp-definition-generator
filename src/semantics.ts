@@ -24,7 +24,11 @@ export class Definition {
         }
         let prefix = this.prefixs.join(' ');
         s += prefix;
-        s += ` ${scopePrefix}${this.name}(${this.params})`;
+        // s can be '', when it's a constructor or destructor
+        if (s !== '' && s !== '\n') {
+            s += ' ';
+        }
+        s += `${scopePrefix}${this.name}(${this.params})`;
         let postfix = this.decoration.join(' ');
         s += (postfix === '' ? '' : ' ' + postfix);
         if (half) {
@@ -56,6 +60,10 @@ const regDeclaration = /(.*)\((.*)\)\s*(\S*)\s*;/;
 export function isDeclaration(statement: string) :boolean {
     if (regDeclaration.exec(statement)) {
         let s = statement;
+        // filt unmatched anglebracket statements.
+        if (!hasMatchedAngleBrackets(statement)) {
+            return false;
+        }
         // filt prefix
         // filt special symbol
         let prefixPos = statement.indexOf('(');
@@ -63,7 +71,7 @@ export function isDeclaration(statement: string) :boolean {
         if (prefix.indexOf('operator') === -1) {
             // filt .
             for (let c of prefix) {
-                if ('.<>='.indexOf(c) !== -1) {
+                if ('.='.indexOf(c) !== -1) {
                     return false;
                 }
             }
@@ -72,13 +80,36 @@ export function isDeclaration(statement: string) :boolean {
         // exclude `=`, for default argument
         let other = statement.substr(prefixPos);
         for (let c of other) {
-            if ('.<>'.indexOf(c) !== -1) {
+            if ('.'.indexOf(c) !== -1) {
                 return false;
             }
         }
         return true;
     }
     return false;
+}
+
+/**
+ * for template parameter
+ * @param content
+ */
+function hasMatchedAngleBrackets(content: string) {
+    let i = 0;
+    let matcher: number[]= [];
+    while (i < content.length) {
+        if (content.charAt(i) === '<') {
+            matcher.push(1);
+        } else if (content.charAt(i) === '>') {
+            if (!matcher.pop()) {
+                return false;
+            }
+        }
+        ++i;
+    }
+    if (matcher.length !== 0) {
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -98,7 +129,7 @@ export function getDefinition(declaration: string, scopes: string[] = []) :Defin
 
     let isVirtual = false;
     // filter specific identifier
-    let filters = ['virtual'];
+    let filters = ['virtual', 'explicit'];
     for (let identifier of rns) {
         let filt = false;
         for (let filter of filters) {
@@ -130,7 +161,7 @@ export function getDefinition(declaration: string, scopes: string[] = []) :Defin
     }
 
     // parameters (not verify for now)
-    definition.params = match[2];
+    definition.params = trimEqual(match[2]);
 
 
     let remain = match[3];
@@ -147,6 +178,19 @@ export function getDefinition(declaration: string, scopes: string[] = []) :Defin
 
     definition.isValid = true;
     return definition;
+}
+
+/**
+ * Helper function, trim `=` in argument list
+ */
+function trimEqual(content: string) {
+    let newContents: string[] = [];
+    let args = content.split(',');
+    for (let arg of args) {
+        let leftSide = arg.split('=')[0].trim();
+        newContents.push(leftSide);
+    }
+    return newContents.join(', ');
 }
 
 

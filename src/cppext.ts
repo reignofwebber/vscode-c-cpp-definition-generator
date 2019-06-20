@@ -61,7 +61,8 @@ export class SourceFile {
     private _getDefinitionLine(declaration: string, scopes: string[]): number {
         let definition = semantics.getDefinition(declaration, scopes);
         let identifier = definition.getIdentifier();
-        let regexIdentifier = new RegExp('\\s+' + identifier);
+        // exactly identifier
+        let regexIdentifier = new RegExp('\(^|\\s+\)' + identifier + '\\s*\\(');
         let line = 0;
         let text = '';
         while (line < this._doc!.lineCount) {
