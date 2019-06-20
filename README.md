@@ -13,4 +13,7 @@
 ![](./examples/generate-definition3.gif)
 
 ## Issues
-### Report any issues [here](https://github.com/reignofwebber/vscode-c-cpp-definition-generator/issues)
+
+ 1. Report any issues [here](https://github.com/reignofwebber/vscode-c-cpp-definition-generator/issues)
+
+2. [Here](./TODO.md) are known issues, these will be fixed in the future version.

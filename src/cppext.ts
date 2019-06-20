@@ -10,7 +10,7 @@ import { fileURLToPath } from "url";
  * determine if the file is a header file.
  * @param fileName
   */
-export function isHeaderFile(fileName: string) :boolean {
+export function isHeaderFile(fileName: string): boolean {
     let dotPos = fileName.lastIndexOf('.');
     let ext = fileName.substr(dotPos);
     if (ext.includes('h')) {
@@ -19,114 +19,109 @@ export function isHeaderFile(fileName: string) :boolean {
     return false;
 }
 
-/**
- * create source file from header file, if source file is already exists, just return
- * @param fullFileName
- * @param isC
- * @returns fd
- */
-export function createSourceFromHeader(fullFileName: string, isC: boolean = true) :SourceFile {
-    let slashPos = fullFileName.lastIndexOf('/');
-    if (slashPos === -1) {
-        slashPos = fullFileName.lastIndexOf('\\');
-    }
-    if (slashPos === -1) {
-        throw new Error('not recognized path');
-    }
 
-
-    let dotPos = fullFileName.lastIndexOf('.');
-
-    let filePath = fullFileName.substr(0, slashPos);
-    let fileNameNoExt = fullFileName.substring(slashPos + 1, dotPos);
-    let headerFileName = fullFileName.substr(slashPos + 1);
-    let file = path.join(filePath, fileNameNoExt + (isC ? '.c' : '.cpp'));
-    return new SourceFile(file, headerFileName);
-}
-
-export function getDeclarationPos(content: string, declaration: string) :number {
+export function getDeclarationPos(content: string, declaration: string): number {
     return content.indexOf(declaration);
 }
 
 
-class SourceFile {
+export class SourceFile {
     private _path: string;
-    constructor(p: string, headerFile: string) {
-        this._path = p;
-        if (!fs.existsSync(p)) {
-            fs.writeFileSync(p, `#include "${headerFile}"\n\n`, 'utf-8');
+    private _doc: vscode.TextDocument | undefined;
+    private _editor: vscode.TextEditor | undefined;
+
+    public constructor(headerFile: string, ext: string) {
+        let fileName = path.basename(headerFile);
+        let dirName = path.dirname(headerFile);
+        let srcName = fileName.split('.').slice(0, 1).join('.') + ext;
+        this._path = path.join(dirName, srcName);
+
+        if (!fs.existsSync(this._path)) {
+            fs.writeFileSync(this._path, `#include "${path.basename(headerFile)}"\n\n`, 'utf-8');
         }
     }
+
     /**
-     * if exists definition in source file.
-     * @param file
-     * @param declaration
+     * show c/cpp file and call updateDefinition
+     * @param declaration declaration snippet
+     * @param scopes for cpp, definition prefix
      */
-    private _getDefinitionLine(declaration: string, scopes: string[]) :[string, number] | undefined {
-        let line = -1;
-        let data = fs.readFileSync(this._path, 'utf-8');
+    async update(declaration: string, scopes: string[]) {
+        this._doc = await vscode.workspace.openTextDocument(vscode.Uri.file(this._path));
+        this._editor = await vscode.window.showTextDocument(this._doc);
+        await this._updateDefinition(declaration, scopes);
+    }
+
+    /**
+     * // TODO c++ overload
+     * find if exist a definition with same name
+     * @param declaration declaration snippet
+     * @param scopes for cpp, definition prefix
+     */
+    private _getDefinitionLine(declaration: string, scopes: string[]): number {
         let definition = semantics.getDefinition(declaration, scopes);
         let identifier = definition.getIdentifier();
-        let definitionIndex = data.indexOf(identifier);
-        // determine if pure identifier
-        let tmpIndex = definitionIndex;
-        // 1. find towards left
-        if (' \t\n\r\v'.indexOf(data.charAt(definitionIndex - 1)) === -1) {
-            return undefined;
+        let regexIdentifier = new RegExp('\\s+' + identifier);
+        let line = 0;
+        let text = '';
+        while (line < this._doc!.lineCount) {
+            text = this._doc!.lineAt(line).text;
+            if (regexIdentifier.exec(text)) {
+                break;
+            }
+            ++line;
         }
-        // 2. find towards right
-        if (' \t\n\r\v('.indexOf(data.charAt(definitionIndex + identifier.length)) === -1) {
-            return undefined;
+        // current definition not exist
+        if (line === this._doc!.lineCount) {
+            return -1;
         }
 
-        if (definitionIndex === -1) { return undefined; }
-        let linebreak = data.indexOf('\n', definitionIndex);
-        let prevContent = data.substr(0, linebreak);
-        let lastLinebreak = prevContent.lastIndexOf('\n');
-        let definitionSnippet = data.substring(lastLinebreak + 1, linebreak);
-        if (definitionSnippet.match(/.+\(.*\).*\{/)) {
-            // determine which line
-            return [definitionSnippet, tools.linesOfContent(prevContent)];
+        if (/.+\(.*\).*\{/.exec(text)) {
+            return line;
         } else {
-            return undefined;
+            return -1;
         }
     }
 
     /**
-     * updateDefinition
-     * @param declaration
+     * update definition
+     * @param declaration declaration snippet
+     * @param scopes for cpp, definition prefix
      */
-    public updateDefinition(declaration :string, scopes: string[]) :vscode.Selection {
-        let definitionDesc = this._getDefinitionLine(declaration, scopes);
-        if (definitionDesc) {
-            let data = fs.readFileSync(this._path, 'utf-8');
-            let definition = semantics.getDefinition(declaration, scopes);
-            if (definition.isValid) {
-                let newData = data.replace(definitionDesc[0], definition.toString(true));
-                fs.writeFileSync(this._path, newData, 'utf-8');
-                let pos = new vscode.Position(definitionDesc[1], 4);
-                return new vscode.Selection(pos, pos);
-            }
-        } else {
+    private async _updateDefinition(declaration: string, scopes: string[]) {
+        let line = this._getDefinitionLine(declaration, scopes);
+        let definition = semantics.getDefinition(declaration, scopes);
+        if (definition.isValid && this._editor) {
+            if (line === -1) {
+                let endLine = this._doc!.lineCount - 1;
+                let endCh = this._doc!.lineAt(endLine).text.length;
+                await this._editor.edit(editBuilder => {
+                    editBuilder.insert(new vscode.Position(endLine, endCh), definition.toString());
+                });
+                endLine = this._doc!.lineCount - 1;
+                let pos = new vscode.Position(endLine - 2, 0);
+                this._editor.selection = new vscode.Selection(pos, pos);
+                vscode.commands.executeCommand('revealLine', {
+                    lineNumber: pos.line,
+                    at: 'center'
+                });
 
-            let definition = semantics.getDefinition(declaration, scopes);
-            if (definition.isValid) {
-                fs.appendFileSync(this._path, definition.toString(), 'utf-8');
-                let length = tools.lines(this._path);
-                let pos = new vscode.Position(length - 3, 4);
-                return new vscode.Selection(pos, pos);
+            } else {
+                let lineEnd = this._doc!.lineAt(line).text.length;
+                let startPos = new vscode.Position(line, 0);
+                let endPos = new vscode.Position(line, lineEnd);
+                await this._editor.edit(editBuilder => {
+                    editBuilder.replace(new vscode.Range(startPos, endPos), definition.toString(true));
+                });
+
+                let pos = new vscode.Position(line + 1, 0);
+                this._editor.selection = new vscode.Selection(pos, pos);
+                vscode.commands.executeCommand('revealLine', {
+                    lineNumber: pos.line,
+                    at: 'center'
+                });
             }
+
         }
-        return new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
     }
-
-    /**
-     * getPath
-     */
-    public getPath() :string {
-        return this._path;
-    }
-
-
-
 }
