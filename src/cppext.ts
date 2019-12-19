@@ -53,16 +53,16 @@ export class SourceFile {
     }
 
     /**
-     * // TODO c++ overload
-     * find if exist a definition with same name
+     * find if exist a definition with same name and params
      * @param declaration declaration snippet
      * @param scopes for cpp, definition prefix
      */
     private _getDefinitionLine(declaration: string, scopes: string[]): number {
         let definition = semantics.getDefinition(declaration, scopes);
         let identifier = definition.getIdentifier();
+        
         // exactly identifier
-        let regexIdentifier = new RegExp('\(^|\\s+\)' + identifier + '\\s*\\(');
+        let regexIdentifier = new RegExp('\(^|\\s+\)' + identifier + '\\s*\\(' + definition.params);
         let line = 0;
         let text = '';
         while (line < this._doc!.lineCount) {
