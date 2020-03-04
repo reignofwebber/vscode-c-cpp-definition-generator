@@ -243,8 +243,8 @@ export class Scope {
                     entity.leftBrace = leftBraceMarkPos;
                     this._scopes.push(entity);
                 } else {
-                    vscode.window.showErrorMessage('grammer error---' + snippet);
-                    throw new Error("grammer error");
+                    vscode.window.showErrorMessage('grammar error---' + snippet);
+                    throw new Error("grammar error");
                 }
                 // ready for next loop
                 lastPos = miniPos + 1;
